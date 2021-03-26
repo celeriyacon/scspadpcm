@@ -4,7 +4,7 @@ CPPFLAGS=-D_GNU_SOURCE=1
 #
 M68K_CC=m68k-unknown-elf-gcc
 M68K_CFLAGS=-Os -g -std=gnu99 -march=68000 -fwrapv -fsigned-char -fno-strict-aliasing -fno-unit-at-a-time -Wall -Werror -Werror="stack-usage=" -Wstack-usage=64
-M68K_AS=m68k-elf-unknown-as
+M68K_AS=m68k-unknown-elf-as
 M68K_ASFLAGS=-march=68000 -mcpu=68ec000
 M68K_OBJCOPY=m68k-unknown-elf-objcopy
 #

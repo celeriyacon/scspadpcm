@@ -28,6 +28,8 @@
 //
 #include "adp68k-data.h"
 
+SoundControlBlock screserve __attribute__((section(".control_block")));
+
 static const uint32 isolator_addr[3] = { (uint32)&isolator, (uint32)&isolator2bit, (uint32)&isolator1bit };
 
 static INLINE void InitADPCM(void)
@@ -119,8 +121,14 @@ static INLINE void InitADPCM(void)
   SCSP(0x100600 + (header_slot << 1)) = 0x03FF;
   SCSP(0x100640 + (header_slot << 1)) = 0x03FF;
   //
+  // The header and nybbles slots' envelope level needs to get to 0x3FF ASAP after keying off, to prevent garbage
+  // from getting into the sound path in the time between the reconfiguration of the sound slot for a new sample
+  // and the key on.
+  //
+  //
   SCSP_SREG(nybbles_slot, 0x04) = 0x0000; // LSA
-  SCSP_SREG(nybbles_slot, 0x0A) = (0x1F << 0); // Release rate
+  SCSP_SREG(nybbles_slot, 0x08) = (0x1F << 0) | (0x1F << 6) | (0x00 << 11); // Attack rate, decay rate, sustain rate
+  SCSP_SREG(nybbles_slot, 0x0A) = (0x1F << 0) | (0x1D << 5) | (0xE << 10); // Release rate, decay level, KRS
   SCSP_SREG(nybbles_slot, 0x0C) = (1 << 8); // Bypass EG and TL and ALFO
   SCSP_SREG(nybbles_slot, 0x0E) = (0x10 << 0) | (0x10 << 6) | (0x05 << 12);
   SCSP_SREG(nybbles_slot, 0x16) = (0x0 << 13) | (0x00 << 8) | (0x7 << 5) | (0x1F << 0);  // Direct send level, pan
@@ -132,10 +140,6 @@ static INLINE void InitADPCM(void)
   SCSP_SREG(selector_slot, 0x0C) = (1 << 8); // Bypass EG and TL and ALFO
   SCSP_SREG(selector_slot, 0x0E) = (0x00 << 0) | (0x00 << 6) | (0x00 << 12);
   SCSP_SREG(selector_slot, 0x16) = (0x0 << 13) | (0x00 << 8) | (0x7 << 5) | (0x0F << 0);  // Direct send level, pan
-  //
-  // The header slot's envelope level needs to get to 0x3FF ASAP after keying if off, to prevent garbage
-  // from getting into the sound path in the time between the reconfiguration of the sound slot for a new sample
-  // and the key on.
   //
   SCSP_SREG(header_slot, 0x04) = 0x0000;
   SCSP_SREG(header_slot, 0x08) = (0x1F << 0) | (0x1F << 6) | (0x00 << 11); // Attack rate, decay rate, sustain rate
@@ -172,8 +176,9 @@ static INLINE void PlayADPCM(unsigned adslot, const uint32 addr)
  const uint16 nybbles_lea = SCSP16(addr + 2);
  const unsigned format = SCSP8(addr + 4);
 
- SCSP_SREG(nybbles_slot, 0x00) = ((nybbles_addr >> 16) & 0xF) | (1 << 4) | (0x0 << 5) | (0x0 << 7) | (0x0 << 9) | (1 << 11);
+ SCSP_SREG(nybbles_slot, 0x00) = ((nybbles_addr >> 16) & 0xF) | (1 << 4) | (0x1 << 5) | (0x0 << 7) | (0x0 << 9) | (1 << 11);
  SCSP_SREG(nybbles_slot, 0x02) = nybbles_addr; // SA
+ SCSP_SREG(nybbles_slot, 0x04) = nybbles_lea - 1; // LEA
  SCSP_SREG(nybbles_slot, 0x06) = nybbles_lea; // LEA
  SCSP_SREG(nybbles_slot, 0x10) = 0x400 + (0x200 >> format) + 0x4; // FNS
  //

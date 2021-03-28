@@ -33,53 +33,16 @@
 
 #include "types.h"
 
+#include "tables.h"
+
 struct ADContext
 {
  unsigned samples_per_block;
  unsigned samples_per_byte;
  unsigned bits_per_sample;
+ unsigned encoded_byte_xor;
  int32 samps[3];
 };
-
-#define PTAB_TOTAL_COUNT 16
-
-/*
- Filters TODO? (4-bit or 8-bit encoding only)
-
- // a b c d e
- // e = (d - c) - (c - b) + (d - c) + d
- // e = 3d - 3c + b
-
- // e = ((d - c) - (c - b)) - ((c - b) - (b - a)) + ((d - c) - (c - b)) + (d - c) + d
- // e = d - c - c + b - c + b + b - a + d - c - c + b + d - c + d
- // e = 4d - 6c + 4b - a
-*/
-static int ptab[PTAB_TOTAL_COUNT][3] =
-{
- {  15360,      0,      0 },
- {      0,      0,      0 },
- {  29440, -13312,      0 },
- {  25088, -14080,      0 },
- {  31232, -15360,      0 },
- {  25088, -18944,   9984 },
- {  23808, -11776,   4352 },
- {  29440, -23040,  10240 },
- {  25344, -20736,  11520 },
- {  13824,  -6656,   7168 },
- {  14848,   2304,  -1024 },
- {  17152,  -2304,  -4096 },
- {  23808,  -7936,   2048 },
- {  17152,  -3840,   2048 },
- {  32760, -16384,   -256 },
- {  28928, -28672,  14336 },
-};
-
-static const int scale_tab[16] =
-{
- 1, 2, 3, 5, 9, 16, 28, 48, 84, 147, 256, 446, 776, 1351, 2352, 4095
-};
-
-#define sign_extend(n, v) ((int32)((uint32)(v) << (32 - (n))) >> (32 - (n)))
 
 static inline int32 CalcPredicted(ADContext* const c, const uint8 pwhich)
 {
@@ -87,7 +50,7 @@ static inline int32 CalcPredicted(ADContext* const c, const uint8 pwhich)
 
  for(unsigned j = 0; j < 3; j++)
  {
-  predicted += ((int64)c->samps[j] * (ptab[pwhich][j] >> 3)) >> 12;
+  predicted += ((int64)c->samps[j] * filter_tab[pwhich][j]) >> 12;
   predicted = sign_extend(26, predicted);
  }
 
@@ -162,14 +125,14 @@ static inline void DecodeBlock(ADContext* const c, const uint8 header, uint8* co
 
  for(unsigned i = 0; i < c->samples_per_block; i++)
  {
-  const unsigned encoded = (encoded_samples[(i / c->samples_per_byte)] >> ((i % c->samples_per_byte) * c->bits_per_sample)) & ((1U << c->bits_per_sample) - 1);
+  const unsigned encoded = ((encoded_samples[(i / c->samples_per_byte)] ^ c->encoded_byte_xor) >> ((i % c->samples_per_byte) * c->bits_per_sample)) & ((1U << c->bits_per_sample) - 1);
   const int32 predicted = CalcPredicted(c, pw);
   const int32 decoded = DecodeSample(c, shift, predicted, encoded);
 
   PushSampleHistory(c, decoded);
 
   if(output)
-   output[i] = decoded;
+   output[i] = decoded >> 8;
  }
 }
 
@@ -181,7 +144,7 @@ static inline int32 EncodeBlock(ADContext* c, const int16* input, int16* output,
  ADContext c_gowith;
  uint8 nibbles[64];
 
- for(unsigned pw = 0; pw < PTAB_TOTAL_COUNT; pw++)
+ for(unsigned pw = 0; pw < FILTER_TAB_COUNT; pw++)
  {
   for(unsigned shift = 0; shift < 16; shift++)
   {
@@ -218,6 +181,9 @@ static inline int32 EncodeBlock(ADContext* c, const int16* input, int16* output,
  for(unsigned i = 0; i < c->samples_per_block; i++)
   block_data[1 + (i / c->samples_per_byte)] |= nibbles[i] << ((i % c->samples_per_byte) * c->bits_per_sample);
 
+ for(unsigned i = 0; i < c->samples_per_block / c->samples_per_byte; i++)
+  block_data[1 + i] ^= c->encoded_byte_xor;
+
  return max_error;
 }
 
@@ -236,7 +202,7 @@ int main(int argc, char* argv[])
  FILE* outfp = NULL;
  //
  SNDFILE *outsf = NULL;
- uint32 pw_usage[PTAB_TOTAL_COUNT] = { 0 };
+ uint32 pw_usage[FILTER_TAB_COUNT] = { 0 };
  uint32 shift_usage[16] = { 0 };
  //
  std::vector<uint8> header_data;
@@ -277,7 +243,9 @@ int main(int argc, char* argv[])
 
  if(argc >= 5)
  {
-  if(!(outsf = sf_open(argv[4], SFM_WRITE, &sfi)))
+  SF_INFO outsfi = sfi;
+
+  if(!(outsf = sf_open(argv[4], SFM_WRITE, &outsfi)))
   {
    printf("Error opening \"%s\".\n", argv[4]);
    ret = -1;
@@ -291,6 +259,7 @@ int main(int argc, char* argv[])
  c.bits_per_sample = 4 >> format;
  c.samples_per_block = 16;
  c.samples_per_byte = 8 / c.bits_per_sample;
+ c.encoded_byte_xor = encoded_byte_xor_tab[format];
 
  for(unsigned i = 0; i < (1 + 1); i++)
   header_data.push_back(0x10);
@@ -334,6 +303,9 @@ int main(int argc, char* argv[])
  if(header_data.back() != 0x00)
   header_data.push_back(0x00);
 
+ if(nybble_data.back() != 0x00)
+  nybble_data.push_back(0x00);
+
  write16(header_data.size() - 1, outfp);
  write16(nybble_data.size() - 1, outfp);
  fputc(format, outfp);
@@ -345,9 +317,9 @@ int main(int argc, char* argv[])
 
  printf("Total Error: %16lld\n", (long long)total_error);
 
- for(unsigned i = 0; i < PTAB_TOTAL_COUNT; i++)
+ for(unsigned i = 0; i < FILTER_TAB_COUNT; i++)
  {
-  printf("/* 0x%08x 0x%02x */ { % 6d, % 6d, % 6d }, \n", pw_usage[i], i, ptab[i][0], ptab[i][1], ptab[i][2]);
+  printf("/* 0x%08x 0x%02x */ { % 6d, % 6d, % 6d }, \n", pw_usage[i], i, filter_tab[i][0], filter_tab[i][1], filter_tab[i][2]);
  }
 
  for(unsigned i = 0; i < 16; i++)

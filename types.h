@@ -64,4 +64,6 @@
 
 #define INLINE inline __attribute__((always_inline))
 
+#define sign_extend(n, v) ((int32)((uint32)(v) << (32 - (n))) >> (32 - (n)))
+
 #endif

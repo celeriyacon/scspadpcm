@@ -16,7 +16,7 @@ Each ADPCM block encodes 16 samples, and playback startup on a channel
 currently has a delay of 16 samples(1 block) plus sound driver overhead.
 
 Looping samples and streaming playback are not currently supported by the
-included demo sound engine and tools, but could be supported in theory.
+included demo sound driver and tools, but could be supported in theory.
 
 The tools require "libsndfile" to compile and run, and building the ISO
 image requires the "genisoimage" utility.  The 68K sound driver and

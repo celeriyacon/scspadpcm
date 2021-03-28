@@ -84,7 +84,7 @@ typedef struct
  uint16 cd_volume[4];
 } SoundControlBlock;
 
-static volatile SoundControlBlock* const adp68k_scblock = (volatile SoundControlBlock*)SCSPVP(0x100);
+static volatile SoundControlBlock* const adp68k_scblock = (volatile SoundControlBlock*)SCSPVP(0x080);
 static volatile uint8* const adp68k_sdbase = (volatile uint8*)SCSPVP(0x2000);
 static volatile uint32* const adp68k_effect_table = (volatile uint32*)SCSPVP(0x2000);
 

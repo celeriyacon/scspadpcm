@@ -22,9 +22,11 @@
  */
 
 #include <stdio.h>
+#include <assert.h>
 
 #include "types.h"
 #include "dsp-macros.h"
+#include "tables.h"
 
 int main(int argc, char* argv[])
 {
@@ -191,12 +193,11 @@ int main(int argc, char* argv[])
  printf("uint16 scale[0x100] =\n{\n");
  for(unsigned i = 0; i < 256; i++)
  {
-  static const uint16 scale_tab[16] =
-  {
-   1, 2, 3, 5, 9, 16, 28, 48, 84, 147, 256, 446, 776, 1351, 2352, 4095
-  };
+  unsigned sv = scale_tab[i & 0xF];
 
-  scale[0x080 ^ i] = scale_tab[i & 0xF] << 3;
+  assert(sv >= 0 && sv <= 4095);
+
+  scale[0x080 ^ i] = sv << 3;
  }
 
  for(unsigned i = 0; i < 0x100; i++)
@@ -204,32 +205,10 @@ int main(int argc, char* argv[])
  printf("};\n\n");
  //
  //
- {
-  static const int16 coeff_tab[16][3] =
-  {
-   {  15360,      0,      0 },
-   {      0,      0,      0 },
-   {  29440, -13312,      0 },
-   {  25088, -14080,      0 },
-   {  31232, -15360,      0 },
-   {  25088, -18944,   9984 },
-   {  23808, -11776,   4352 },
-   {  29440, -23040,  10240 },
-   {  25344, -20736,  11520 },
-   {  13824,  -6656,   7168 },
-   {  14848,   2304,  -1024 },
-   {  17152,  -2304,  -4096 },
-   {  23808,  -7936,   2048 },
-   {  17152,  -3840,   2048 },
-   {  32760, -16384,   -256 },
-   {  28928, -28672,  14336 },
-  };
-
-  printf("uint16 coeff[0x30] =\n{\n");
-  for(unsigned i = 0; i < 0x30; i++)
-   printf(" 0x%04x,\n", (uint16)coeff_tab[(i ^ 0x8) & 0xF][i >> 4]);
-  printf("};\n\n");
- }
+ printf("uint16 coeff[0x30] =\n{\n");
+ for(unsigned i = 0; i < 0x30; i++)
+  printf(" 0x%04x,\n", (uint16)((uint32)filter_tab[(i ^ 0x8) & 0xF][i >> 4] << 3));
+ printf("};\n\n");
  //
  //
  printf("uint16 selector[0x8] =\n{\n");
@@ -241,9 +220,9 @@ int main(int argc, char* argv[])
  printf("uint8 isolator[0x200] =\n{\n");
  for(unsigned i = 0; i < 512; i++)
  {
-  uint8 tmp = ((i & 0x1) ? (((i ^ 0x100) >> 5) & 0xF) : ((i >> 1) & 0xF)) << 4;
+  const uint8 bv = (i >> 1) ^ encoded_byte_xor_tab[0] ^ 0x80;
 
-  printf(" 0x%02x,\n", tmp);
+  printf(" 0x%02x,\n", ((bv >> ((i & 0x1) << 2)) & 0xF) << 4);
  }
  printf("};\n\n");
  //
@@ -252,8 +231,9 @@ int main(int argc, char* argv[])
  for(unsigned i = 0; i < 1024; i++)
  {
   static const uint8 tab[4] = { 0x30, 0x70, 0x90, 0xD0 };
+  const uint8 bv = (i >> 2) ^ encoded_byte_xor_tab[1] ^ 0x80;
 
-  printf(" 0x%02x,\n", tab[((i ^ 0x200) >> (2 + ((i & 0x3) << 1))) & 0x3]);
+  printf(" 0x%02x,\n", tab[(bv >> ((i & 0x3) << 1)) & 0x3]);
  }
  printf("};\n\n");
  //
@@ -262,8 +242,9 @@ int main(int argc, char* argv[])
  for(unsigned i = 0; i < 2048; i++)
  {
   static const uint8 tab[2] = { 0x30, 0xD0 };
+  const uint8 bv = (i >> 3) ^ encoded_byte_xor_tab[2] ^ 0x80;
 
-  printf(" 0x%02x,\n", tab[((i ^ 0x400) >> (3 + (i & 0x7))) & 0x1]);
+  printf(" 0x%02x,\n", tab[(bv >> (i & 0x7)) & 0x1]);
  }
  printf("};\n\n");
 

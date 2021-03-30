@@ -121,9 +121,9 @@ static INLINE void InitADPCM(void)
   SCSP(0x100600 + (header_slot << 1)) = 0x03FF;
   SCSP(0x100640 + (header_slot << 1)) = 0x03FF;
   //
-  // The header and nybbles slots' envelope level needs to get to 0x3FF ASAP after keying off, to prevent garbage
-  // from getting into the sound path in the time between the reconfiguration of the sound slot for a new sample
-  // and the key on.
+  // The header and nybbles slots' envelope level needs to get to 0x3C0 ASAP after keying on, to prevent garbage
+  // from getting into the sound path later after key off, in the time between the reconfiguration of the sound
+  // slot for a new sample and the key on.
   //
   //
   SCSP_SREG(nybbles_slot, 0x04) = 0x0000; // LSA

@@ -127,8 +127,7 @@ static INLINE void InitADPCM(void)
   //
   //
   SCSP_SREG(nybbles_slot, 0x04) = 0x0000; // LSA
-  SCSP_SREG(nybbles_slot, 0x08) = (0x1F << 0) | (0x1F << 6) | (0x00 << 11); // Attack rate, decay rate, sustain rate
-  SCSP_SREG(nybbles_slot, 0x0A) = (0x1F << 0) | (0x1D << 5) | (0xE << 10); // Release rate, decay level, KRS
+  SCSP_SREG(nybbles_slot, 0x08) = (0x1F << 0) | (0x1F << 6) | (0x1F << 11); // Attack rate, decay rate, sustain rate
   SCSP_SREG(nybbles_slot, 0x0C) = (1 << 8); // Bypass EG and TL and ALFO
   SCSP_SREG(nybbles_slot, 0x0E) = (0x10 << 0) | (0x10 << 6) | (0x05 << 12);
   SCSP_SREG(nybbles_slot, 0x16) = (0x0 << 13) | (0x00 << 8) | (0x7 << 5) | (0x1F << 0);  // Direct send level, pan
@@ -142,8 +141,7 @@ static INLINE void InitADPCM(void)
   SCSP_SREG(selector_slot, 0x16) = (0x0 << 13) | (0x00 << 8) | (0x7 << 5) | (0x0F << 0);  // Direct send level, pan
   //
   SCSP_SREG(header_slot, 0x04) = 0x0000;
-  SCSP_SREG(header_slot, 0x08) = (0x1F << 0) | (0x1F << 6) | (0x00 << 11); // Attack rate, decay rate, sustain rate
-  SCSP_SREG(header_slot, 0x0A) = (0x1F << 0) | (0x1D << 5) | (0xE << 10); // Release rate, decay level, KRS
+  SCSP_SREG(header_slot, 0x08) = (0x1F << 0) | (0x1F << 6) | (0x1F << 11); // Attack rate, decay rate, sustain rate
   SCSP_SREG(header_slot, 0x0C) = (1 << 8) | (1 << 9);
   SCSP_SREG(header_slot, 0x0E) = (0x00 << 0) | (0x00 << 6) | (0x05 << 12);
   SCSP_SREG(header_slot, 0x14) = ((0x00 + (adslot << 1)) << 3) | (0x07 << 0); // dsp mix select, mix level
@@ -170,25 +168,32 @@ static INLINE void PlayADPCM(unsigned adslot, const uint32 addr)
  const unsigned header_slot = 16 + (adslot << 1);
  const unsigned isolator_slot = 17 + (adslot << 1);
  //
- const uint32 header_addr = addr + 5;
- const uint16 header_lea = SCSP16(addr + 0);
- const uint32 nybbles_addr = header_addr + header_lea + 1;
- const uint16 nybbles_lea = SCSP16(addr + 2);
+ const uint16 block_count = SCSP16(addr + 0);
+ const uint16 loop_block = SCSP16(addr + 2);
  const unsigned format = SCSP8(addr + 4);
+ const uint32 header_addr = addr + 5;
+ const uint32 nybbles_addr = 1 + header_addr + block_count;
+ //
+ const uint16 header_lsa = loop_block;
+ const uint16 nybbles_lsa = loop_block << (3 - format);
+ const uint16 header_lea = block_count + (loop_block == block_count);
+ const uint16 nybbles_lea = (block_count << (3 - format)) + (loop_block == block_count);
 
  SCSP_SREG(nybbles_slot, 0x00) = ((nybbles_addr >> 16) & 0xF) | (1 << 4) | (0x1 << 5) | (0x0 << 7) | (0x0 << 9) | (1 << 11);
- SCSP_SREG(nybbles_slot, 0x02) = nybbles_addr; // SA
- SCSP_SREG(nybbles_slot, 0x04) = nybbles_lea - 1; // LEA
- SCSP_SREG(nybbles_slot, 0x06) = nybbles_lea; // LEA
+ SCSP_SREG(nybbles_slot, 0x02) = nybbles_addr;	// SA
+ SCSP_SREG(nybbles_slot, 0x04) = nybbles_lsa;
+ SCSP_SREG(nybbles_slot, 0x06) = nybbles_lea;
+ SCSP_SREG(nybbles_slot, 0x0A) = (0x1F << 0) | (0x1F << 5) | (0xE << 10) | (1 << 15); // Release rate, decay level, KRS, EG bypass
  SCSP_SREG(nybbles_slot, 0x10) = 0x400 + (0x200 >> format) + 0x4; // FNS
  //
  SCSP_SREG(selector_slot, 0x00) = (0 << 4) | (0x1 << 5) | (0x0 << 7) | (0x0 << 9) | (1 << 11);
  SCSP_SREG(selector_slot, 0x10) = ((2 - format) << 11); // FNS, Octave
  //
  SCSP_SREG(header_slot, 0x00) = ((header_addr >> 16) & 0xF) | (1 << 4) | (0x1 << 5) | (0x0 << 7) | (0x0 << 9) | (1 << 11);
- SCSP_SREG(header_slot, 0x02) = header_addr;
- SCSP_SREG(header_slot, 0x04) = header_lea - 1;
+ SCSP_SREG(header_slot, 0x02) = header_addr;	// SA
+ SCSP_SREG(header_slot, 0x04) = header_lsa;
  SCSP_SREG(header_slot, 0x06) = header_lea;
+ SCSP_SREG(header_slot, 0x0A) = (0x1F << 0) | (0x1F << 5) | (0xE << 10) | (1 << 15); // Release rate, decay level, KRS, EG bypass
  SCSP_SREG(header_slot, 0x10) = 0x400 + 0x040 + 0x4; // FNS
  //
  SCSP_SREG(isolator_slot, 0x00) = (1 << 4) | (0x1 << 5) | (0x0 << 7) | (0x0 << 9) | (1 << 11);
@@ -240,6 +245,10 @@ static INLINE void Update(void)
   const unsigned header_slot = 16 + (ads << 1);
   const unsigned isolator_slot = 17 + (ads << 1);
   const unsigned mask = 0xF7 | (adp68k_scblock->adpcm[ads].action & ADP68K_ACTION_NOP);
+  const unsigned egcmask = 0x7F | (adp68k_scblock->adpcm[ads].action & ADP68K_ACTION_NOP);
+
+  SCSP_SREG_HI(header_slot, 0x0A) &= egcmask;
+  SCSP_SREG_HI(nybbles_slot, 0x0A) &= egcmask;
 
   SCSP_SREG_HI(header_slot, 0x00) &= mask;
   SCSP_SREG_HI(nybbles_slot, 0x00) &= mask;

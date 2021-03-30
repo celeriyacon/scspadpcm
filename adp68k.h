@@ -28,7 +28,7 @@
 #include "scsp.h"
 
 // Don't change these constants.
-#define ADP68K_ACTION_NOP  0x08
+#define ADP68K_ACTION_NOP  0x88
 #define ADP68K_ACTION_PLAY 0x11
 #define ADP68K_ACTION_STOP 0x01
 

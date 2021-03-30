@@ -7,8 +7,14 @@
 // Must be quantities that can fit into a signed 13-bit integer
 static const int filter_tab[FILTER_TAB_COUNT][3] =
 {
+ //
+ // These first two filters must remain unaltered, due to hardcoded
+ // assumptions in the code.
+ //
  {  1920,     0,     0 },
  {     0,     0,     0 },
+ //
+ //
  {  3680, -1664,     0 },
  {  3136, -1760,     0 },
  {  3904, -1920,     0 },

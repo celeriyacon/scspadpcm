@@ -114,6 +114,50 @@ static void TestADPCMDCBias(void)
  }
 }
 
+static void TestADPCMLoop(void)
+{
+ for(unsigned i = 0; i < 8; i++)
+ {
+  volatile ADPCMChannelControl* adpcc = &adp68k_scblock->adpcm[i];
+
+  while(SCSP_SCIPD & 0x20);
+  adpcc->id = SAMPLE_ID_BUGLOOP_2BIT;
+  adpcc->volume[0] =  (i & 4) ? 0 : (0x4000 >> (i & 3));
+  adpcc->volume[1] = !(i & 4) ? 0 : (0x4000 >> (i & 3));
+  adpcc->action = ADP68K_ACTION_PLAY;
+  SCSP_SCIPD_LO = 0x20;
+
+  Wait(40000000);
+ }
+
+ while(SCSP_SCIPD & 0x20);
+ for(unsigned i = 0; i < 8; i++)
+ {
+  volatile ADPCMChannelControl* adpcc = &adp68k_scblock->adpcm[i];
+
+  adpcc->action = ADP68K_ACTION_STOP;
+ }
+ SCSP_SCIPD_LO = 0x20;
+}
+
+static void TestADPCMLong(void)
+{
+ volatile ADPCMChannelControl* adpcc = &adp68k_scblock->adpcm[0];
+
+ while(SCSP_SCIPD & 0x20);
+ adpcc->id = SAMPLE_ID_LONG_1BIT;
+ adpcc->volume[0] = 0x4000;
+ adpcc->volume[1] = 0x4000;
+ adpcc->action = ADP68K_ACTION_PLAY;
+ SCSP_SCIPD_LO = 0x20;
+
+ Wait(324000000);
+
+ while(SCSP_SCIPD & 0x20);
+ adpcc->action = ADP68K_ACTION_STOP;
+ SCSP_SCIPD_LO = 0x20;
+}
+
 static void TestSquare(void)
 {
  TimeBegin();
@@ -338,6 +382,8 @@ void start(void)
  {
   TestADPCMVoice();
   TestADPCMDCBias();
+  TestADPCMLoop();
+  TestADPCMLong();
   TestSquare();
   TestNoise();
   TestSawVroom();

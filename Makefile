@@ -42,7 +42,7 @@ bintoinc:	Makefile bintoinc.cpp
 #
 #
 #
-ADP_OBJ=voice-4bit.adp voice-2bit.adp voice-1bit.adp dcbiasend-4bit.adp dcbiasend-2bit.adp dcbiasend-1bit.adp
+ADP_OBJ=voice-4bit.adp voice-2bit.adp voice-1bit.adp dcbiasend-4bit.adp dcbiasend-2bit.adp dcbiasend-1bit.adp bugloop-2bit.adp long-1bit.adp
 
 %-4bit.adp:	adpencode %.wav
 		./adpencode 0 $*.wav $*-4bit.adp
